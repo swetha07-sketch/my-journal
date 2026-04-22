@@ -3,6 +3,73 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
+const APP_PASSWORD = "sh@kti98";
+
+function PasswordScreen({ onUnlock }: { onUnlock: () => void }) {
+  const [input, setInput] = useState("");
+  const [error, setError] = useState(false);
+  const [shake, setShake] = useState(false);
+
+  const handleSubmit = () => {
+    if (input === APP_PASSWORD) {
+      sessionStorage.setItem("journal_unlocked", "true");
+      onUnlock();
+    } else {
+      setError(true);
+      setShake(true);
+      setInput("");
+      setTimeout(() => setShake(false), 500);
+    }
+  };
+
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { background: #faf8f4; font-family: 'DM Sans', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .lock-wrap { width: 100%; max-width: 360px; margin: 0 auto; padding: 2rem 1.5rem; text-align: center; }
+        .lock-icon { font-size: 2.5rem; margin-bottom: 1.5rem; }
+        .lock-title { font-family: 'Lora', serif; font-size: 1.8rem; font-weight: 400; color: #1a1714; margin-bottom: 6px; }
+        .lock-sub { font-size: 13px; color: #a8a29e; margin-bottom: 2rem; letter-spacing: 0.06em; text-transform: uppercase; }
+        .lock-input-wrap { position: relative; margin-bottom: 12px; }
+        .lock-input { width: 100%; padding: 12px 16px; border: 1px solid #e5e0d8; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 16px; color: #1a1714; background: #ffffff; outline: none; text-align: center; letter-spacing: 0.1em; transition: border 0.15s; }
+        .lock-input:focus { border-color: #8b6f47; }
+        .lock-input.error { border-color: #e24b4a; background: #fde8e8; }
+        .lock-input.shake { animation: shake 0.4s ease; }
+        .lock-btn { width: 100%; padding: 12px; background: #1a1714; color: #ffffff; border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; margin-top: 4px; }
+        .lock-btn:hover { opacity: 0.82; }
+        .error-msg { font-size: 13px; color: #e24b4a; margin-bottom: 12px; }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20% { transform: translateX(-8px); }
+          40% { transform: translateX(8px); }
+          60% { transform: translateX(-5px); }
+          80% { transform: translateX(5px); }
+        }
+      `}</style>
+      <div className="lock-wrap">
+        <div className="lock-icon">🔒</div>
+        <div className="lock-title">My Journal</div>
+        <div className="lock-sub">Enter password to continue</div>
+        {error && <div className="error-msg">Incorrect password — try again</div>}
+        <div className="lock-input-wrap">
+          <input
+            className={`lock-input${error ? " error" : ""}${shake ? " shake" : ""}`}
+            type="password"
+            placeholder="••••••••••••"
+            value={input}
+            onChange={e => { setInput(e.target.value); setError(false); }}
+            onKeyDown={e => e.key === "Enter" && handleSubmit()}
+            autoFocus
+          />
+        </div>
+        <button className="lock-btn" onClick={handleSubmit}>Unlock</button>
+      </div>
+    </>
+  );
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -53,6 +120,7 @@ const emptyForm = (): FormState => {
 };
 
 export default function Home() {
+  const [unlocked, setUnlocked] = useState(false);
   const [tab, setTab] = useState("write");
   const [form, setForm] = useState<FormState>(emptyForm());
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -62,7 +130,14 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { fetchEntries(); }, []);
+  useEffect(() => {
+    const isUnlocked = sessionStorage.getItem("journal_unlocked") === "true";
+    if (isUnlocked) setUnlocked(true);
+  }, []);
+
+  useEffect(() => { if (unlocked) fetchEntries(); }, [unlocked]);
+
+  if (!unlocked) return <PasswordScreen onUnlock={() => setUnlocked(true)} />;
 
   const fetchEntries = async () => {
     setLoading(true);
